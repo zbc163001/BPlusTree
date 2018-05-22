@@ -379,7 +379,7 @@ func(tree *	BPlusTree) MergeNode( Parent Position,  X Position, S Position, i in
 	return Parent
 }
 
-//自上往下递归，但是第一个节点怎么指定？  TODO  从根开始向下遍历？
+//自上往下递归，但是第一个节点怎么指定？  TODO  从根开始向下遍历？ 切片的初始化记得先搞好 倒数第二层节点
 func(tree *BPlusTree)  RecursiveInsert( beInsertedElement Position, Key int, i int , Parent Position,data int) Position{
 	var  InsertIndex,upperLimit int
 	var  Sibling Position
