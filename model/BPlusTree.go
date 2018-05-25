@@ -218,7 +218,7 @@ func(tree *BPlusTree) RemoveElement(isData bool,Parent Position ,X Position , po
 		k = deleteIndex + 1
 		for (k < keyNum){
 			X.Key[k - 1] = X.Key[k]
-			X.leafNode.datas[k - 1] = X.leafNode.datas[k - 1]
+			X.leafNode.datas[k - 1] = X.leafNode.datas[k]
 			k++
 		}
 
@@ -449,8 +449,8 @@ return beInsertedElement, result
 }
 
 /* 插入 */
-func(tree *BPlusTree) Insert( T Position, Key int,data int) (Position,bool){
-	return tree.RecursiveInsert(T, Key, 0, nil, data) //从根节点开始插入
+func(tree *BPlusTree) Insert(  Key int,data int) (Position,bool){
+	return tree.RecursiveInsert(tree.root, Key, 0, nil, data) //从根节点开始插入
 }
 
 func(tree *BPlusTree) RecursiveRemove( beRemovedElement Position, Key int, posAtParent int, Parent Position) (Position, bool){
@@ -535,8 +535,8 @@ func(tree *BPlusTree) RecursiveRemove( beRemovedElement Position, Key int, posAt
 }
 
 /* 删除 */
-func(tree *BPlusTree) Remove( T Position, Key int) (Position,bool){
-	return tree.RecursiveRemove(T, Key, 0, nil)
+func(tree *BPlusTree) Remove(Key int) (Position,bool){
+	return tree.RecursiveRemove(tree.root, Key, 0, nil)
 }
 
 /* 销毁 */
@@ -647,7 +647,7 @@ func main (){
 	var i int
 	i = 1
 	for i< 9 {
-		_ ,result:= tree.Insert(tree.root,i,i * 10)
+		_ ,result:= tree.Insert(i,i * 10)
 		fmt.Print(i)
 		if result == false {
 			print("数据已存在")
@@ -655,13 +655,19 @@ func main (){
 		i++
 	}
 
-	resultDate,success:=tree.FindData(4)
+	tree.Remove(7)
+	tree.Remove(6)
+	tree.Remove(5)
+	resultDate,success:=tree.FindData(5)
 	if success == true {
 		fmt.Print(resultDate)
+		fmt.Printf("\n")
 	}
+
+	//遍历结点元素
 	i = 0
-	for i < tree.root.KeyNum{
-		fmt.Print(tree.root.Key[i])
+	for i < tree.root.Children[1].KeyNum{
+		fmt.Println(tree.root.Children[1].leafNode.datas[i])
 		i++
 	}
 }
