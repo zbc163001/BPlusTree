@@ -32,21 +32,21 @@ type BPlusTree struct {
 
 func MallocNewNode(isLeaf bool) *BPlusFullNode {
 	var NewNode *BPlusFullNode
-	if isLeaf == false {
+	if isLeaf == true {
 		NewLeaf := MallocNewLeaf()
 		NewNode = &BPlusFullNode{
 			KeyNum:   0,
-			Key:      make([]int, M ),
+			Key:      make([]int, M + 1),  //申请M + 1是因为插入时可能暂时出现节点key大于M 的情况,待后期再分裂处理
 			isLeaf:   isLeaf,
-			Children: make([]*BPlusFullNode, M),
+			Children: nil,
 			leafNode: NewLeaf,
 		}
 	}else{
 		NewNode = &BPlusFullNode{
 			KeyNum:  0,
-			Key:     make([]int, M ),
+			Key:     make([]int, M + 1),
 			isLeaf:   isLeaf,
-			Children: make([]*BPlusFullNode, M),
+			Children: make([]*BPlusFullNode, M + 1),
 			leafNode: nil,
 		}
 	}
@@ -172,7 +172,6 @@ func(tree *BPlusTree) InsertElement (isData bool,Parent Position, X Position, Ke
 
 		X.Key[insertIndex] = Key
 		X.leafNode.datas[insertIndex] = data
-
 		if (Parent != nil) {
 			Parent.Key[posAtParent] = X.Key[0] //可能min_key 已发生改变
 		}
@@ -262,10 +261,10 @@ func(tree *BPlusTree) MoveElement(src Position , dst Position , parent Position 
 	var j int
 	var srcInFront bool
 
-	srcInFront = true
+	srcInFront = false
 
 	if (src.Key[0] < dst.Key[0]) {
-		srcInFront = false
+		srcInFront = true
 	}
 	j = 0
 /* 节点Src在Dst前面 */
@@ -347,9 +346,12 @@ func(tree *BPlusTree)  SplitNode(Parent Position, beSplitedNode Position, i int)
 	j = beSplitedNode.KeyNum / 2
 	keyNum = beSplitedNode.KeyNum
 	for (j < keyNum){
-		if (beSplitedNode.Children[0] != nil){ //Internal node
+		if (beSplitedNode.isLeaf == false){ //Internal node
 			NewNode.Children[k] = beSplitedNode.Children[j]
 			beSplitedNode.Children[j] = nil
+		}else {
+			NewNode.leafNode.datas[k] = beSplitedNode.leafNode.datas[j]
+			beSplitedNode.leafNode.datas[j] = INT_MIN
 		}
 		NewNode.Key[k] = beSplitedNode.Key[j]
 		beSplitedNode.Key[j] = INT_MIN
@@ -361,7 +363,7 @@ func(tree *BPlusTree)  SplitNode(Parent Position, beSplitedNode Position, i int)
 
 	if (Parent != nil) {
 		tree.InsertElement(false, Parent, NewNode, INT_MIN, i+1, INT_MIN, INT_MIN)
-		//TODO parent > limit 时的递归split recurvie中实现
+		// parent > limit 时的递归split recurvie中实现
 	}else{
 /* 如果是X是根，那么创建新的根并返回 */
 		Parent = MallocNewNode(false)
@@ -371,7 +373,7 @@ func(tree *BPlusTree)  SplitNode(Parent Position, beSplitedNode Position, i int)
 		return Parent
 	}
 
-	return beSplitedNode //TODO
+	return beSplitedNode
 	// 为什么返回一个X一个Parent?
 }
 
@@ -396,20 +398,20 @@ func(tree *BPlusTree)  RecursiveInsert( beInsertedElement Position, Key int, pos
 	var  InsertIndex,upperLimit int
 	var  Sibling Position
 	var  result bool
-
+    result = true
 /* 查找分支 */
 	InsertIndex = 0
 	for  (InsertIndex < beInsertedElement.KeyNum && Key >= beInsertedElement.Key[InsertIndex]){
-/* 重复值不插入,但数据库中仍然存在 */
+/* 重复值不插入 */
 		if (Key == beInsertedElement.Key[InsertIndex]){
-			return beInsertedElement ,true
+			return beInsertedElement ,false
 		}
 		InsertIndex++
 	}
-
-	//if (InsertIndex != 0 && beInsertedElement.Children[0] != nil) {
-	//	InsertIndex--
-	//}
+    //key必须大于被插入节点的最小元素，才能插入到此节点，故需回退一步
+	if (InsertIndex != 0 && beInsertedElement.isLeaf == false) {
+		InsertIndex--
+	}
 
 /* 树叶 */
 	if (beInsertedElement.isLeaf == true) {
@@ -471,7 +473,7 @@ func(tree *BPlusTree) RecursiveRemove( beRemovedElement Position, Key int, posAt
 	if (beRemovedElement.isLeaf == true){
 /* 没找到 */
 		if (Key != beRemovedElement.Key[deleteIndex] || deleteIndex == beRemovedElement.KeyNum) {
-			return beRemovedElement, false //TODO 应该返回一个错误
+			return beRemovedElement, false
 		}
 	}else {
 		if (deleteIndex == beRemovedElement.KeyNum || Key < beRemovedElement.Key[deleteIndex]) {
@@ -586,18 +588,20 @@ func(tree *BPlusTree) FindData(key int) (int, bool) {
 	var currentNode *BPlusFullNode
 	var index int
 	currentNode = tree.root
-	for true {
+	for index < currentNode.KeyNum {
+		index = 0
 		for key >= currentNode.Key[index] && index < currentNode.KeyNum{
 			index ++
 		}
 		if  index == 0 {
 			return  INT_MIN, false
 		}else{
+			index--
 			if currentNode.isLeaf == false {
-				currentNode = currentNode.Children[index - 1]
+				currentNode = currentNode.Children[index]
 			}else{
-				if key == currentNode.Key[index - 1] {
-					return currentNode.leafNode.datas[index - 1], true
+				if key == currentNode.Key[index] {
+					return currentNode.leafNode.datas[index], true
 				}else{
 					return  INT_MIN, false
 				}
@@ -641,11 +645,24 @@ func main (){
 	var tree BPlusTree
 	(&tree).Initialize()
 	var i int
-	for i< 10 {
-		_ ,result:= tree.Insert(tree.root,i,i)
+	i = 1
+	for i< 9 {
+		_ ,result:= tree.Insert(tree.root,i,i * 10)
+		fmt.Print(i)
 		if result == false {
-			break
+			print("数据已存在")
 		}
+		i++
+	}
+
+	resultDate,success:=tree.FindData(4)
+	if success == true {
+		fmt.Print(resultDate)
+	}
+	i = 0
+	for i < tree.root.KeyNum{
+		fmt.Print(tree.root.Key[i])
+		i++
 	}
 }
 
